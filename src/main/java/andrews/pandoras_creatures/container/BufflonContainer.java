@@ -6,34 +6,33 @@ import andrews.pandoras_creatures.container.slot.BufflonStorageSlot;
 import andrews.pandoras_creatures.entities.BufflonEntity;
 import andrews.pandoras_creatures.registry.PCContainers;
 import andrews.pandoras_creatures.registry.PCItems;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.inventory.container.Container;
-import net.minecraft.inventory.container.Slot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.PacketBuffer;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 
-public class BufflonContainer extends Container
+public class BufflonContainer extends AbstractContainerMenu
 {	
     // Inventory of Bufflon Entity
 	private final Inventory bufflonStorge;
     //Instance of Bufflon Entity
     private final BufflonEntity bufflonEntity;
 	
-	public BufflonContainer(final int windowId, final PlayerInventory playerInventory, PacketBuffer data)
+	public BufflonContainer(final int windowId, final Inventory playerInventory, FriendlyByteBuf data)
 	{
 		this(windowId, playerInventory, data.readInt());
 	}
 	
-	public BufflonContainer(int windowId, PlayerInventory playerInventory, int entityId)
+	public BufflonContainer(int windowId, Inventory playerInventory, int entityId)
 	{
 		super(PCContainers.BUFFLON.get(), windowId);
 		
-        this.bufflonEntity = (BufflonEntity) playerInventory.player.world.getEntityByID(entityId);
+        this.bufflonEntity = (BufflonEntity) playerInventory.player.level.getEntity(entityId);
         this.bufflonStorge = bufflonEntity.bufflonStorage;
 
-        bufflonStorge.openInventory(playerInventory.player);
+        bufflonStorge.startOpen(playerInventory.player);
 
         //The Bufflon Saddle Slot
         this.addSlot(new BufflonSaddleSlot(bufflonEntity, bufflonStorge, 0, -17, 72));
@@ -70,29 +69,29 @@ public class BufflonContainer extends Container
 	 * Determines whether supplied player can use this container
 	 */
 	@Override
-	public boolean canInteractWith(PlayerEntity playerIn)
+	public boolean stillValid(Player playerIn)
 	{
-		return this.bufflonStorge.isUsableByPlayer(playerIn) && this.bufflonEntity.isAlive() && this.bufflonEntity.getDistance(playerIn) < 8.0F;
+		return this.bufflonStorge.stillValid(playerIn) && this.bufflonEntity.isAlive() && this.bufflonEntity.getDistance(playerIn) < 8.0F;
 	}
 	
 	@Override
-	public ItemStack transferStackInSlot(PlayerEntity playerIn, int index)
+	public ItemStack quickMoveStack(Player playerIn, int index)
 	{
 		ItemStack itemstack = ItemStack.EMPTY;
-		Slot slot = this.inventorySlots.get(index);
-	 	if(slot != null && slot.getHasStack())
+		Slot slot = this.slots.get(index);
+	 	if(slot != null && slot.hasItem())
 	 	{
-	 		ItemStack itemstackInSlot = slot.getStack();
+	 		ItemStack itemstackInSlot = slot.getItem();
 	 		itemstack = itemstackInSlot.copy();
 	 		
 	    	if(index < (6 * 9) + 2)
 	    	{
-	    		if(!this.mergeItemStack(itemstackInSlot, (6 * 9) + 2, this.inventorySlots.size(), true))
+	    		if(!this.moveItemStackTo(itemstackInSlot, (6 * 9) + 2, this.slots.size(), true))
 	    		{
 	    			return ItemStack.EMPTY;
 	    		}
 	    	}
-	    	else if(!this.mergeItemStack(itemstackInSlot, 0, getInventorySizeForAttachments(), false))
+	    	else if(!this.moveItemStackTo(itemstackInSlot, 0, getInventorySizeForAttachments(), false))
 	    	{
 	    		return ItemStack.EMPTY;
 	    	}
@@ -100,11 +99,11 @@ public class BufflonContainer extends Container
 	    	//Some Slot update code
 	    	if(itemstackInSlot.isEmpty())
 	    	{
-	    		slot.putStack(ItemStack.EMPTY);
+	    		slot.set(ItemStack.EMPTY);
 	    	}
 	    	else
 	    	{
-	    		slot.onSlotChanged();
+	    		slot.setChanged();
 	    	}
 	 	}
 	 	return itemstack;
@@ -115,21 +114,21 @@ public class BufflonContainer extends Container
 	 */
 	private int getInventorySizeForAttachments()
 	{
-		if(this.inventorySlots.get(1).getHasStack() == false)
+		if(this.slots.get(1).hasItem() == false)
 		{
 			return 2;
 		}
 		else
 		{
-			if(this.inventorySlots.get(1).getStack().getItem() == PCItems.BUFFLON_PLAYER_SEATS.get())
+			if(this.slots.get(1).getItem().getItem() == PCItems.BUFFLON_PLAYER_SEATS.get())
 			{
 				return 2;
 			}
-			else if(this.inventorySlots.get(1).getStack().getItem() == PCItems.BUFFLON_SMALL_STORAGE.get())
+			else if(this.slots.get(1).getItem().getItem() == PCItems.BUFFLON_SMALL_STORAGE.get())
 			{
 				return (3 * 9) + 2;
 			}
-			else if(this.inventorySlots.get(1).getStack().getItem() == PCItems.BUFFLON_LARGE_STORAGE.get())
+			else if(this.slots.get(1).getItem().getItem() == PCItems.BUFFLON_LARGE_STORAGE.get())
 			{
 				return (6 * 9) + 2;
 			}
@@ -144,10 +143,10 @@ public class BufflonContainer extends Container
 	 * Called when the container is closed.
 	 */
 	@Override
-	public void onContainerClosed(PlayerEntity playerIn)
+	public void removed(Player playerIn)
 	{
-		super.onContainerClosed(playerIn);
-		this.bufflonStorge.closeInventory(playerIn);
+		super.removed(playerIn);
+		this.bufflonStorge.stopOpen(playerIn);
 	}
 	
 	/**
